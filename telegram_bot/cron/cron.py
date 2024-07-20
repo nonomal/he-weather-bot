@@ -32,13 +32,13 @@ async def cron_handler(db: Session = Depends(get_db)):
         )
 
         # 用户定时订阅判断逻辑
-        cur_hour = str(DateUtil.get_cur_hour(chat.time_zone))
+        cur_hour = str(DateUtil.get_cur_hour(str(chat.time_zone)))
         if cur_hour not in chat.sub_hours:
             continue
 
         job = scheduler.add_job(
             cron_send_weather,
-            args=(chat, chat.ding_bot),
+            args=(chat, chat.all_locations, chat.ding_bot),
             trigger="date",
             run_date=run_date,
             misfire_grace_time=None,
@@ -58,8 +58,11 @@ async def one_hour_cron_handler(db: Session = Depends(get_db)):
 
     count = 0
     for i, chat in enumerate(crud.get_active_users(db)):
-        run_date = now + timedelta(milliseconds=i * MIL_SECONDS_INTERVAL)
+        # 仅针对主动开启订阅的用户检查投递预警信息
+        if not chat.cron_jobs:
+            continue
 
+        run_date = now + timedelta(milliseconds=i * MIL_SECONDS_INTERVAL)
         job = scheduler.add_job(
             cron_send_warning,
             args=(chat, chat.ding_bot),
